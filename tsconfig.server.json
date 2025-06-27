@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "strict": true,
+    "noEmit": false,
+    "outDir": "./dist",
+    "rootDir": "./mcp-server",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "ts-node": {
+    "esm": false,
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  },
+  "include": [
+    "mcp-server/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src"
+  ]
+}

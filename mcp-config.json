@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "angular-demo": {
+      "command": "node",
+      "args": ["dist/server.js"],
+      "description": "Angular MCP Demo Server with calculator, weather, and text processing tools"
+    }
+  }
+}
