@@ -426,7 +426,7 @@ setInterval(() => {
   } else {
     console.log('⏰ No SSE clients connected for time update');
   }
-}, 6000); // Update every 6 seconds
+}, 10000); // Update every 10 seconds
 
 // Helper function to check if request is an initialization request
 function isInitializeRequest(body: any): boolean {

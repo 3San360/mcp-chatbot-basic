@@ -11,7 +11,7 @@ import { Subscription } from 'rxjs';
   template: `
     <div class="chat-container">
       <div class="chat-header">
-        <h2>🤖 MCP Chatbot with Live Time Updates</h2>
+        <h2>🤖 MCP Chatbot with Live Time Updates 2</h2>
         <div class="connection-status">
           <span [class]="isConnected ? 'connected' : 'disconnected'">
             {{ isConnected ? '🟢 Connected' : '🔴 Disconnected' }}
@@ -32,7 +32,7 @@ import { Subscription } from 'rxjs';
           <div class="time-content">
             <span class="time">{{ currentTime.currentTime }}</span>
             <span class="date">{{ currentTime.date }}</span>
-            <small>📡 Updated every 6 seconds via SSE</small>
+            <small>📡 Updated every 10 seconds via SSE</small>
           </div>
         </div>
       </div>

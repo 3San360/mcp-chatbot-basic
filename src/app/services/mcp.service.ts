@@ -72,7 +72,7 @@ export class McpService {
       content: '**Welcome to MCP Chatbot! 🤖**\n\n' +
                'Simple demo with real-time server updates.\n\n' +
                '**Features:**\n' +
-               '• ⏰ **Live Time Updates** - Server sends time every 6 seconds\n' +
+               '• ⏰ **Live Time Updates** - Server sends time every 10 seconds\n' +
                '• 🧮 **Calculator** - Try "calculate 5 + 3"\n' +
                '• 🌤️ **Weather** - Ask "weather in Paris"\n\n' +
                '**Watch for automatic time updates! ⏰**',
@@ -91,7 +91,7 @@ export class McpService {
       this.eventSource.onopen = () => {
         console.log('SSE connection established');
         this.addMessage({
-          content: '**⏰ Live Time Updates Connected!**\n\nServer will send current time every 6 seconds.',
+          content: '**⏰ Live Time Updates Connected!**\n\nServer will send current time every 10 seconds.',
           sender: 'assistant',
           type: 'text'
         });
@@ -109,6 +109,7 @@ export class McpService {
       // Handle simple time updates from server
       this.eventSource.addEventListener('time-update', (event: any) => {
         try {
+          console.log('Time update received:', event.data);
           const timeData = JSON.parse(event.data);
           this.timeDataSubject.next(timeData);
           this.addMessage({
@@ -150,7 +151,7 @@ export class McpService {
       
       this.addMessage({
         content: '**🎉 Connected to MCP server!**\n\n' +
-                 '⏰ Time updates will start automatically every 6 seconds.\n\n' +
+                 '⏰ Time updates will start automatically every 10 seconds.\n\n' +
                  '*(Simplified demo mode)*',
         sender: 'assistant',
         type: 'text'
