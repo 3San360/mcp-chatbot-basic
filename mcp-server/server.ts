@@ -362,7 +362,7 @@ function broadcastToSSEClients(eventType: string, data: any) {
       client.write(`event: ${eventType}\n`);
       client.write(`data: ${JSON.stringify(data)}\n\n`);
     } catch (error) {
-      console.error('Error broadcasting to SSE client:', error);
+      console.error('Error --> broadcasting to SSE client:', error);
     }
   });
 }
