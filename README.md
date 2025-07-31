@@ -44,7 +44,7 @@ The server will run on `http://localhost:3001`
 ```bash
 npm start
 ```
-The app will run on `http://localhost:4200`
+The app will run on `http://localhost:4202`
 
 ### 4. Development Mode (Both Together)
 ```bash

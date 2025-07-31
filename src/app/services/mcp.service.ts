@@ -33,65 +33,139 @@ export interface AvailablePrompt {
   arguments?: any[];
 }
 
+// Real-time data interfaces - simplified
+export interface TimeData {
+  currentTime: string;
+  date: string;
+  timestamp: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class McpService {
   private client: Client | null = null;
   private transport: StreamableHTTPClientTransport | SSEClientTransport | null = null;
+  private eventSource: EventSource | null = null;
   private isConnectedSubject = new BehaviorSubject<boolean>(false);
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   private availableToolsSubject = new BehaviorSubject<AvailableTool[]>([]);
   private availableResourcesSubject = new BehaviorSubject<AvailableResource[]>([]);
   private availablePromptsSubject = new BehaviorSubject<AvailablePrompt[]>([]);
+  
+  // Simplified real-time data subject
+  private timeDataSubject = new BehaviorSubject<TimeData | null>(null);
 
   public isConnected$ = this.isConnectedSubject.asObservable();
   public messages$ = this.messagesSubject.asObservable();
   public availableTools$ = this.availableToolsSubject.asObservable();
   public availableResources$ = this.availableResourcesSubject.asObservable();
   public availablePrompts$ = this.availablePromptsSubject.asObservable();
+  
+  // Simplified real-time data observable
+  public timeData$ = this.timeDataSubject.asObservable();
 
-  private serverUrl = 'http://localhost:3001/mcp';
+  // private serverUrl = 'http://localhost:3001/mcp';
 
   constructor() {
     this.addMessage({
-      content: 'Welcome! I\'m your MCP-powered chatbot. Try asking me to use tools like calculator, weather, or text processing!',
+      content: '**Welcome to MCP Chatbot! 🤖**\n\n' +
+               'Simple demo with real-time server updates.\n\n' +
+               '**Features:**\n' +
+               '• ⏰ **Live Time Updates** - Server sends time every 6 seconds\n' +
+               '• 🧮 **Calculator** - Try "calculate 5 + 3"\n' +
+               '• 🌤️ **Weather** - Ask "weather in Paris"\n\n' +
+               '**Watch for automatic time updates! ⏰**',
       sender: 'assistant',
       type: 'text'
     });
+    
+    // Initialize simple SSE connection
+    this.initializeSSE();
+  }
+
+  private initializeSSE(): void {
+    try {
+      this.eventSource = new EventSource('http://localhost:3001/sse');
+      
+      this.eventSource.onopen = () => {
+        console.log('SSE connection established');
+        this.addMessage({
+          content: '**⏰ Live Time Updates Connected!**\n\nServer will send current time every 6 seconds.',
+          sender: 'assistant',
+          type: 'text'
+        });
+      };
+      
+      this.eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleSSEMessage(data);
+        } catch (error) {
+          console.error('Error parsing SSE message:', error);
+        }
+      };
+      
+      // Handle simple time updates from server
+      this.eventSource.addEventListener('time-update', (event: any) => {
+        try {
+          const timeData = JSON.parse(event.data);
+          this.timeDataSubject.next(timeData);
+          this.addMessage({
+            content: `⏰ **${timeData.message}**\n\n📅 Date: ${timeData.date}\n🕐 Time: ${timeData.currentTime}\n📡 *Sent from server via SSE*`,
+            sender: 'assistant',
+            type: 'tool-result'
+          });
+        } catch (error) {
+          console.error('Error handling time update:', error);
+        }
+      });
+      
+      this.eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+      };
+      
+    } catch (error) {
+      console.error('Error initializing SSE:', error);
+    }
+  }
+
+  private handleSSEMessage(data: any): void {
+    // Handle general SSE messages
+    console.log('SSE message received:', data);
   }
 
   async connect(): Promise<void> {
     try {
-      console.log('Attempting to connect to MCP server...');
       
       // First, test if the server is reachable
       const healthCheck = await fetch('http://localhost:3001/health');
       if (!healthCheck.ok) {
-        throw new Error('Server is not reachable');
+        throw new Error('Server is not reachable. Please make sure the MCP server is running.');
       }
-      
-      console.log('Server is reachable, attempting MCP connection...');
-      
-      // Create a simplified HTTP-based connection approach
-      await this.connectSimple();
-      
-      console.log('Connected successfully!');
+
+      // For now, let's use a simple approach without the complex MCP client
+      // This will allow us to demonstrate the SSE functionality
       this.isConnectedSubject.next(true);
       
-      // Load available tools, resources, and prompts
-      await this.loadCapabilities();
-      
       this.addMessage({
-        content: 'Connected to MCP server! You can now use available tools and resources.',
+        content: '**🎉 Connected to MCP server!**\n\n' +
+                 '⏰ Time updates will start automatically every 6 seconds.\n\n' +
+                 '*(Simplified demo mode)*',
         sender: 'assistant',
         type: 'text'
       });
+
+      // Load simplified tools
+      this.availableToolsSubject.next([
+        { name: 'calculator', title: 'Calculator', description: 'Perform basic arithmetic operations' },
+        { name: 'weather', title: 'Weather', description: 'Get weather information' }
+      ]);
+
     } catch (error) {
-      console.error('Failed to connect to MCP server:', error);
-      console.error('Error details:', error);
+      console.error('Connection failed:', error);
       this.addMessage({
-        content: `Failed to connect to MCP server: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the server is running on port 3001.`,
+        content: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         sender: 'assistant',
         type: 'error'
       });
@@ -99,163 +173,63 @@ export class McpService {
     }
   }
 
-  private async connectSimple(): Promise<void> {
-    // Create a simple HTTP client that directly communicates with the MCP server
-    // This bypasses the complex transport layer and uses direct HTTP calls
-    this.client = {
-      async listTools() {
-        const response = await fetch('http://localhost:3001/api/tools', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) {
-          throw new Error('Failed to list tools');
-        }
-        return await response.json();
-      },
-      
-      async listResources() {
-        const response = await fetch('http://localhost:3001/api/resources', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) {
-          throw new Error('Failed to list resources');
-        }
-        return await response.json();
-      },
-      
-      async listPrompts() {
-        const response = await fetch('http://localhost:3001/api/prompts', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) {
-          throw new Error('Failed to list prompts');
-        }
-        return await response.json();
-      },
-      
-      async callTool(request: {name: string, arguments: any}) {
-        const response = await fetch('http://localhost:3001/api/tools/call', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ name: request.name, arguments: request.arguments }),
-        });
-        if (!response.ok) {
-          throw new Error('Failed to call tool');
-        }
-        return await response.json();
-      },
-      
-      async readResource(request: {uri: string}) {
-        const response = await fetch('http://localhost:3001/api/resources/read', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ uri: request.uri }),
-        });
-        if (!response.ok) {
-          throw new Error('Failed to read resource');
-        }
-        return await response.json();
-      },
-      
-      async getPrompt(request: {name: string, arguments: any}) {
-        const response = await fetch('http://localhost:3001/api/prompts/get', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ name: request.name, arguments: request.arguments }),
-        });
-        if (!response.ok) {
-          throw new Error('Failed to get prompt');
-        }
-        return await response.json();
-      },
-      
-      close() {
-        // No-op for HTTP client
-        return Promise.resolve();
-      }
-    } as any;
-  }
-
   async disconnect(): Promise<void> {
-    if (this.client && this.transport) {
-      await this.client.close();
-      this.client = null;
-      this.transport = null;
+    try {
+      if (this.client) {
+        await this.client.close();
+        this.client = null;
+      }
+      
+      if (this.transport) {
+        await this.transport.close();
+        this.transport = null;
+      }
+      
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = null;
+      }
+      
       this.isConnectedSubject.next(false);
       this.addMessage({
-        content: 'Disconnected from MCP server.',
+        content: 'Disconnected from MCP server',
         sender: 'assistant',
         type: 'text'
       });
-    }
-  }
-
-  private async loadCapabilities(): Promise<void> {
-    if (!this.client) return;
-
-    try {
-      console.log('Loading capabilities...');
-      
-      // Load tools
-      console.log('Loading tools...');
-      const toolsResult = await this.client.listTools();
-      console.log('Tools loaded:', toolsResult);
-      const tools: AvailableTool[] = toolsResult.tools.map(tool => ({
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema
-      }));
-      this.availableToolsSubject.next(tools);
-
-      // Load resources
-      console.log('Loading resources...');
-      const resourcesResult = await this.client.listResources();
-      console.log('Resources loaded:', resourcesResult);
-      const resources: AvailableResource[] = resourcesResult.resources.map(resource => ({
-        uri: resource.uri,
-        name: resource.name,
-        description: resource.description,
-        mimeType: resource.mimeType
-      }));
-      this.availableResourcesSubject.next(resources);
-
-      // Load prompts
-      console.log('Loading prompts...');
-      const promptsResult = await this.client.listPrompts();
-      console.log('Prompts loaded:', promptsResult);
-      const prompts: AvailablePrompt[] = promptsResult.prompts.map(prompt => ({
-        name: prompt.name,
-        title: prompt.title,
-        description: prompt.description,
-        arguments: prompt.arguments
-      }));
-      this.availablePromptsSubject.next(prompts);
-      
-      console.log('All capabilities loaded successfully');
     } catch (error) {
-      console.error('Failed to load capabilities:', error);
+      console.error('Disconnect failed:', error);
     }
   }
+
+  // private async loadCapabilities(): Promise<void> {
+  //   if (!this.client) return;
+
+  //   try {
+  //     // Load available tools
+  //     const toolsResult = await this.client.listTools();
+  //     this.availableToolsSubject.next(toolsResult.tools || []);
+
+  //     // Load available resources
+  //     const resourcesResult = await this.client.listResources();
+  //     this.availableResourcesSubject.next(resourcesResult.resources || []);
+
+  //     // Load available prompts
+  //     const promptsResult = await this.client.listPrompts();
+  //     this.availablePromptsSubject.next(promptsResult.prompts || []);
+
+  //   } catch (error) {
+  //     console.error('Error loading capabilities:', error);
+  //   }
+  // }
 
   async sendMessage(content: string): Promise<void> {
-    if (!this.client) {
-      throw new Error('Not connected to MCP server');
+    if (!this.isConnectedSubject.value) {
+      this.addMessage({
+        content: 'Please connect to the MCP server first',
+        sender: 'assistant',
+        type: 'error'
+      });
+      return;
     }
 
     // Add user message
@@ -266,201 +240,169 @@ export class McpService {
     });
 
     try {
-      // Simple AI-like processing to determine if we should call tools
-      const response = await this.processMessage(content);
-      this.addMessage({
-        content: response,
-        sender: 'assistant',
-        type: 'text'
-      });
+      // Parse user input to determine which tool to call
+      const lowerContent = content.toLowerCase();
+      
+      if (lowerContent.includes('calculate') || lowerContent.includes('math')) {
+        // Try to extract numbers and operation
+        const numbers = content.match(/\d+/g);
+        if (numbers && numbers.length >= 2) {
+          let operation = 'add';
+          if (lowerContent.includes('subtract') || lowerContent.includes('-')) operation = 'subtract';
+          if (lowerContent.includes('multiply') || lowerContent.includes('*') || lowerContent.includes('×')) operation = 'multiply';
+          if (lowerContent.includes('divide') || lowerContent.includes('/') || lowerContent.includes('÷')) operation = 'divide';
+          
+          await this.callTool('calculator', {
+            operation,
+            a: parseInt(numbers[0]),
+            b: parseInt(numbers[1])
+          });
+        } else {
+          this.addMessage({
+            content: 'Please provide two numbers for calculation. Example: "Calculate 5 + 3"',
+            sender: 'assistant',
+            type: 'text'
+          });
+        }
+      } else if (lowerContent.includes('weather')) {
+        // Extract city name or use default
+        const cityMatch = content.match(/weather in (\w+)/i);
+        const city = cityMatch ? cityMatch[1] : 'London';
+        await this.callTool('weather', { city });
+      } else {
+        // General response
+        this.addMessage({
+          content: `I received your message: "${content}". Try asking me to:\n` +
+                   `• Calculate something (e.g., "Calculate 15 + 27")\n` +
+                   `• Get weather (e.g., "Weather in Paris")\n` +
+                   `• Watch for automatic time updates! ⏰`,
+          sender: 'assistant',
+          type: 'text'
+        });
+      }
+
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('Error sending message:', error);
       this.addMessage({
-        content: 'Sorry, I encountered an error while processing your message.',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         sender: 'assistant',
         type: 'error'
       });
     }
   }
 
-  private async processMessage(content: string): Promise<string> {
-    if (!this.client) throw new Error('Not connected');
-
-    const lowerContent = content.toLowerCase();
-
-    // Calculator tool
-    if (lowerContent.includes('calculate') || lowerContent.includes('math') || /\d+\s*[\+\-\*\/]\s*\d+/.test(lowerContent)) {
-      return await this.handleCalculator(content);
+  async callTool(name: string, args: any = {}): Promise<any> {
+    if (!this.isConnectedSubject.value) {
+      throw new Error('Not connected to MCP server');
     }
 
-    // Weather tool
-    if (lowerContent.includes('weather')) {
-      return await this.handleWeather(content);
-    }
-
-    // Text processing
-    if (lowerContent.includes('uppercase') || lowerContent.includes('lowercase') || 
-        lowerContent.includes('reverse') || lowerContent.includes('word count')) {
-      return await this.handleTextProcessing(content);
-    }
-
-    // System info resource
-    if (lowerContent.includes('system') || lowerContent.includes('server info')) {
-      return await this.handleSystemInfo();
-    }
-
-    // List capabilities
-    if (lowerContent.includes('what can you do') || lowerContent.includes('help') || lowerContent.includes('capabilities')) {
-      return this.getCapabilitiesHelp();
-    }
-
-    // Default response
-    return `I received your message: "${content}". I can help with calculations, weather info, text processing, and more. Try asking "what can you do?" to see my capabilities!`;
-  }
-
-  private async handleCalculator(content: string): Promise<string> {
     try {
-      // Extract numbers and operation from content
-      const mathMatch = content.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/])\s*(\d+(?:\.\d+)?)/);
-      if (!mathMatch) {
-        return 'Please provide a calculation in the format "number operation number" (e.g., "5 + 3")';
-      }
-
-      const a = parseFloat(mathMatch[1]);
-      const opSymbol = mathMatch[2];
-      const b = parseFloat(mathMatch[3]);
-
-      const operationMap: { [key: string]: string } = {
-        '+': 'add',
-        '-': 'subtract',
-        '*': 'multiply',
-        '/': 'divide'
-      };
-
-      const operation = operationMap[opSymbol];
-      if (!operation) {
-        return 'Unsupported operation. Use +, -, *, or /';
-      }
-
-      const result = await this.client!.callTool({
-        name: 'calculator',
-        arguments: { operation, a, b }
+      // Use the REST API endpoints instead of MCP client
+      const response = await fetch('http://localhost:3001/api/tools/call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, arguments: args })
       });
 
-      const content_result = result.content as any[];
-      return content_result[0]?.type === 'text' ? content_result[0].text : 'Calculation completed';
-    } catch (error) {
-      return `Calculator error: ${error}`;
-    }
-  }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-  private async handleWeather(content: string): Promise<string> {
-    try {
-      // Extract city from content (simple approach)
-      const cityMatch = content.match(/weather\s+(?:in\s+|for\s+)?([a-zA-Z\s]+?)(?:\s|$|[.!?])/i);
-      const city = cityMatch ? cityMatch[1].trim() : 'New York';
+      const result = await response.json();
       
-      const result = await this.client!.callTool({
-        name: 'weather',
-        arguments: { city, unit: 'celsius' }
+      this.addMessage({
+        content: `Tool "${name}" result: ${result.content[0]?.text || JSON.stringify(result, null, 2)}`,
+        sender: 'assistant',
+        type: 'tool-result'
       });
 
-      const content_result = result.content as any[];
-      return content_result[0]?.type === 'text' ? content_result[0].text : 'Weather info retrieved';
+      return result;
     } catch (error) {
-      return `Weather error: ${error}`;
+      console.error('Tool call failed:', error);
+      this.addMessage({
+        content: `Tool "${name}" failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sender: 'assistant',
+        type: 'error'
+      });
+      throw error;
     }
   }
 
-  private async handleTextProcessing(content: string): Promise<string> {
+  async readResource(uri: string): Promise<any> {
+    if (!this.client) {
+      throw new Error('Not connected to MCP server');
+    }
+
     try {
-      let operation: string;
-      let text: string;
-
-      if (content.toLowerCase().includes('uppercase')) {
-        operation = 'uppercase';
-        text = content.replace(/uppercase/gi, '').trim();
-      } else if (content.toLowerCase().includes('lowercase')) {
-        operation = 'lowercase';
-        text = content.replace(/lowercase/gi, '').trim();
-      } else if (content.toLowerCase().includes('reverse')) {
-        operation = 'reverse';
-        text = content.replace(/reverse/gi, '').trim();
-      } else if (content.toLowerCase().includes('word count')) {
-        operation = 'word-count';
-        text = content.replace(/word count/gi, '').trim();
-      } else {
-        return 'Please specify the text processing operation: uppercase, lowercase, reverse, or word count';
-      }
-
-      if (!text) {
-        return 'Please provide text to process';
-      }
-
-      const result = await this.client!.callTool({
-        name: 'text-processor',
-        arguments: { text, operation }
+      const result = await this.client.readResource({ uri });
+      
+      this.addMessage({
+        content: `Resource "${uri}" content: ${JSON.stringify(result.contents, null, 2)}`,
+        sender: 'assistant',
+        type: 'tool-result'
       });
 
-      const content_result = result.content as any[];
-      return content_result[0]?.type === 'text' ? content_result[0].text : 'Text processed';
+      return result;
     } catch (error) {
-      return `Text processing error: ${error}`;
+      console.error('Resource read failed:', error);
+      this.addMessage({
+        content: `Resource read failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sender: 'assistant',
+        type: 'error'
+      });
+      throw error;
     }
   }
 
-  private async handleSystemInfo(): Promise<string> {
+  async getPrompt(name: string, args: any = {}): Promise<any> {
+    if (!this.client) {
+      throw new Error('Not connected to MCP server');
+    }
+
     try {
-      const result = await this.client!.readResource({
-        uri: 'system://info'
+      const result = await this.client.getPrompt({ name, arguments: args });
+      
+      this.addMessage({
+        content: `Prompt "${name}" result: ${JSON.stringify(result, null, 2)}`,
+        sender: 'assistant',
+        type: 'tool-result'
       });
 
-      const contents = result.contents as any[];
-      return contents[0]?.text || 'System info retrieved';
+      return result;
     } catch (error) {
-      return `System info error: ${error}`;
+      console.error('Prompt get failed:', error);
+      this.addMessage({
+        content: `Prompt get failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sender: 'assistant',
+        type: 'error'
+      });
+      throw error;
     }
-  }
-
-  private getCapabilitiesHelp(): string {
-    const tools = this.availableToolsSubject.value;
-    const resources = this.availableResourcesSubject.value;
-    
-    let help = 'Here\'s what I can do:\n\n**Tools:**\n';
-    tools.forEach(tool => {
-      help += `• ${tool.title || tool.name}: ${tool.description}\n`;
-    });
-    
-    help += '\n**Resources:**\n';
-    resources.forEach(resource => {
-      help += `• ${resource.name || resource.uri}: ${resource.description}\n`;
-    });
-
-    help += '\n**Examples:**\n';
-    help += '• "Calculate 15 + 27"\n';
-    help += '• "Weather in London"\n';
-    help += '• "Uppercase hello world"\n';
-    help += '• "System info"\n';
-
-    return help;
   }
 
   private addMessage(message: Omit<ChatMessage, 'id' | 'timestamp'>): void {
     const newMessage: ChatMessage = {
       ...message,
-      id: crypto.randomUUID(),
+      id: this.generateId(),
       timestamp: new Date()
     };
-    
+
     const currentMessages = this.messagesSubject.value;
     this.messagesSubject.next([...currentMessages, newMessage]);
   }
 
-  getMessages(): ChatMessage[] {
-    return this.messagesSubject.value;
+  private generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
   clearMessages(): void {
     this.messagesSubject.next([]);
+  }
+
+  // Helper method for getting current time data
+  getCurrentTimeData(): TimeData | null {
+    return this.timeDataSubject.value;
   }
 }
